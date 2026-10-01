@@ -1,0 +1,87 @@
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: ai-job-application
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql://jobuser:jobpassword@postgres:5432/jobautomation
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    volumes:
+      - ./resumes:/app/resumes
+      - ./generated_resumes:/app/generated_resumes
+
+    expose:
+      - "8000"
+
+    networks:
+      - job-network
+
+
+  postgres:
+    image: postgres:16-alpine
+
+    container_name: job-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: jobautomation
+      POSTGRES_USER: jobuser
+      POSTGRES_PASSWORD: jobpassword
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    expose:
+      - "5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobuser -d jobautomation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - job-network
+
+
+  nginx:
+    image: nginx:alpine
+
+    container_name: job-nginx
+
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      - app
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+    networks:
+      - job-network
+
+
+volumes:
+  postgres_data:
+
+
+networks:
+  job-network:
+    driver: bridge
